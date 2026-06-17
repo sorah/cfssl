@@ -391,6 +391,44 @@ pushd cli/serve && rice embed-go && popd
 
 Then building with `go build` will use the embedded resources.
 
+### PKCS #11 Support
+
+CFSSL can use a CA private key stored in a PKCS #11 token (such as a
+hardware security module) for local signing. Because PKCS #11 relies on
+cgo and a Cryptoki module loaded at runtime, this support is **off by
+default** and must be enabled with the `pkcs11` build tag and cgo:
+
+```
+$ CGO_ENABLED=1 go build -tags pkcs11 ./cmd/cfssl
+```
+
+The key is selected with a [RFC 7512](https://tools.ietf.org/html/rfc7512)
+`pkcs11:` URI passed wherever a CA key is expected (the `-ca-key` flag, or
+the `key-file`/equivalent in API requests). The companion `-ca` flag still
+provides the CA certificate. For example:
+
+```
+$ cfssl sign \
+    -ca ca.pem \
+    -ca-key 'pkcs11:token=my-token;object=ca-key?module-path=/usr/lib/softhsm/libsofthsm2.so&pin-value=1234' \
+    -config config.json -profile www csr.pem
+```
+
+The most commonly used URI attributes are `module-path` (path to the
+Cryptoki shared library), `token`/`serial`/`slot-id` (to select the
+token), and `object`/`id` (to select the key pair). The user PIN is
+supplied with either `pin-value` (the PIN inline) or `pin-source`. A
+`pin-source` may be:
+
+* `env:NAME` -- read the PIN from the `NAME` environment variable
+  (a CFSSL extension, recommended to keep the PIN out of the process
+  arguments);
+* a file: URI (`file:/path`, `file:///path`) or a bare path -- read the
+  PIN from a file.
+
+A binary built without the `pkcs11` tag reports a clear "unavailable"
+error if a `pkcs11:` URI is supplied.
+
 ### Additional Documentation
 
 Additional documentation can be found in the "doc" directory:

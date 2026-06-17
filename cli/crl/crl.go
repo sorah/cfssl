@@ -53,6 +53,9 @@ func generateCRL(c cli.Config) (crlBytes []byte, err error) {
 	if err != nil {
 		return nil, err
 	}
+	if err := cli.CheckCAKeyNotPKCS11(c.CAKeyFile); err != nil {
+		return nil, err
+	}
 	log.Debug("loading CA key: ", c.CAKeyFile)
 	cakey, err := helpers.ReadBytes(c.CAKeyFile)
 	if err != nil {

@@ -1,11 +1,13 @@
 package cli
 
 import (
+	"errors"
 	"flag"
 	"time"
 
 	"github.com/cloudflare/cfssl/config"
 	"github.com/cloudflare/cfssl/helpers"
+	"github.com/cloudflare/cfssl/helpers/pkcs11uri"
 	"github.com/cloudflare/cfssl/log"
 	"github.com/cloudflare/cfssl/signer/universal"
 )
@@ -78,7 +80,7 @@ func registerFlags(c *Config, f *flag.FlagSet) {
 	f.StringVar(&c.CertFile, "cert", "", "Client certificate that contains the public key")
 	f.StringVar(&c.CSRFile, "csr", "", "Certificate signature request file for new public key")
 	f.StringVar(&c.CAFile, "ca", "", "CA used to sign the new certificate -- accepts '[file:]fname' or 'env:varname'")
-	f.StringVar(&c.CAKeyFile, "ca-key", "", "CA private key -- accepts '[file:]fname' or 'env:varname'")
+	f.StringVar(&c.CAKeyFile, "ca-key", "", "CA private key -- accepts '[file:]fname', 'env:varname', or, for signing, a 'pkcs11:' URI (requires the pkcs11 build tag)")
 	f.StringVar(&c.TLSCertFile, "tls-cert", "", "Other endpoint CA to set up TLS protocol")
 	f.StringVar(&c.TLSKeyFile, "tls-key", "", "Other endpoint CA private key")
 	f.StringVar(&c.MutualTLSCAFile, "mutual-tls-ca", "", "Mutual TLS - require clients be signed by this CA ")
@@ -135,13 +137,36 @@ func registerFlags(c *Config, f *flag.FlagSet) {
 }
 
 // RootFromConfig returns a universal signer Root structure that can
-// be used to produce a signer.
+// be used to produce a signer. When the CA key is given as a PKCS #11
+// URI (RFC 7512) it is routed to the PKCS #11 signer instead of being
+// treated as a file path.
 func RootFromConfig(c *Config) universal.Root {
+	cfg := map[string]string{
+		"cert-file": c.CAFile,
+	}
+	if pkcs11uri.IsPKCS11URI(c.CAKeyFile) {
+		cfg["pkcs11"] = c.CAKeyFile
+	} else {
+		cfg["key-file"] = c.CAKeyFile
+	}
+
 	return universal.Root{
-		Config: map[string]string{
-			"cert-file": c.CAFile,
-			"key-file":  c.CAKeyFile,
-		},
+		Config:      cfg,
 		ForceRemote: c.Remote != "",
 	}
+}
+
+// ErrPKCS11Unsupported is returned by commands that read the CA key
+// directly as a file and therefore cannot use a PKCS #11 key. Only the
+// signing operations (sign, gencert, serve) honor a "pkcs11:" -ca-key.
+var ErrPKCS11Unsupported = errors.New("PKCS #11 keys (pkcs11: URIs) are only supported for signing operations, not this command")
+
+// CheckCAKeyNotPKCS11 returns ErrPKCS11Unsupported when caKey is a
+// PKCS #11 URI. Commands that consume the CA key as a file should call
+// this to fail with a clear message instead of an opaque file error.
+func CheckCAKeyNotPKCS11(caKey string) error {
+	if pkcs11uri.IsPKCS11URI(caKey) {
+		return ErrPKCS11Unsupported
+	}
+	return nil
 }

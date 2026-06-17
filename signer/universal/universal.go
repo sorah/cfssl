@@ -11,6 +11,7 @@ import (
 	"github.com/cloudflare/cfssl/info"
 	"github.com/cloudflare/cfssl/signer"
 	"github.com/cloudflare/cfssl/signer/local"
+	"github.com/cloudflare/cfssl/signer/pkcs11"
 	"github.com/cloudflare/cfssl/signer/remote"
 )
 
@@ -46,7 +47,25 @@ func fileBackedSigner(root *Root, policy *config.Signing) (signer.Signer, bool, 
 	return signer, true, err
 }
 
+// pkcs11Signer determines whether a PKCS #11-backed local signer is
+// supported. The key is identified by a PKCS #11 URI under the
+// "pkcs11" config key, paired with the certificate under "cert-file".
+func pkcs11Signer(root *Root, policy *config.Signing) (signer.Signer, bool, error) {
+	uri := root.Config["pkcs11"]
+	if uri == "" {
+		return nil, false, nil
+	}
+
+	if !pkcs11.Enabled {
+		return nil, true, cferr.New(cferr.PrivateKeyError, cferr.Unavailable)
+	}
+
+	signer, err := pkcs11.New(uri, root.Config["cert-file"], policy)
+	return signer, true, err
+}
+
 var localSignerList = []localSignerCheck{
+	pkcs11Signer,
 	fileBackedSigner,
 }
 
