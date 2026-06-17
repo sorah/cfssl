@@ -6,6 +6,7 @@ import (
 
 	"github.com/cloudflare/cfssl/config"
 	"github.com/cloudflare/cfssl/helpers"
+	"github.com/cloudflare/cfssl/helpers/pkcs11uri"
 	"github.com/cloudflare/cfssl/log"
 	"github.com/cloudflare/cfssl/signer/universal"
 )
@@ -78,7 +79,7 @@ func registerFlags(c *Config, f *flag.FlagSet) {
 	f.StringVar(&c.CertFile, "cert", "", "Client certificate that contains the public key")
 	f.StringVar(&c.CSRFile, "csr", "", "Certificate signature request file for new public key")
 	f.StringVar(&c.CAFile, "ca", "", "CA used to sign the new certificate -- accepts '[file:]fname' or 'env:varname'")
-	f.StringVar(&c.CAKeyFile, "ca-key", "", "CA private key -- accepts '[file:]fname' or 'env:varname'")
+	f.StringVar(&c.CAKeyFile, "ca-key", "", "CA private key -- accepts '[file:]fname', 'env:varname', or a 'pkcs11:' URI (requires the pkcs11 build tag)")
 	f.StringVar(&c.TLSCertFile, "tls-cert", "", "Other endpoint CA to set up TLS protocol")
 	f.StringVar(&c.TLSKeyFile, "tls-key", "", "Other endpoint CA private key")
 	f.StringVar(&c.MutualTLSCAFile, "mutual-tls-ca", "", "Mutual TLS - require clients be signed by this CA ")
@@ -135,13 +136,21 @@ func registerFlags(c *Config, f *flag.FlagSet) {
 }
 
 // RootFromConfig returns a universal signer Root structure that can
-// be used to produce a signer.
+// be used to produce a signer. When the CA key is given as a PKCS #11
+// URI (RFC 7512) it is routed to the PKCS #11 signer instead of being
+// treated as a file path.
 func RootFromConfig(c *Config) universal.Root {
+	cfg := map[string]string{
+		"cert-file": c.CAFile,
+	}
+	if pkcs11uri.IsPKCS11URI(c.CAKeyFile) {
+		cfg["pkcs11"] = c.CAKeyFile
+	} else {
+		cfg["key-file"] = c.CAKeyFile
+	}
+
 	return universal.Root{
-		Config: map[string]string{
-			"cert-file": c.CAFile,
-			"key-file":  c.CAKeyFile,
-		},
+		Config:      cfg,
 		ForceRemote: c.Remote != "",
 	}
 }
