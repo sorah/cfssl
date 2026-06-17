@@ -403,9 +403,11 @@ $ CGO_ENABLED=1 go build -tags pkcs11 ./cmd/cfssl
 ```
 
 The key is selected with a [RFC 7512](https://tools.ietf.org/html/rfc7512)
-`pkcs11:` URI passed wherever a CA key is expected (the `-ca-key` flag, or
-the `key-file`/equivalent in API requests). The companion `-ca` flag still
-provides the CA certificate. For example:
+`pkcs11:` URI passed wherever a CA key is expected via `-ca-key`: signing
+(`cfssl sign`, `cfssl gencert`), CA bootstrap/renewal (`cfssl gencert
+-initca -ca-key …` and `-renewca`), CRL signing (`cfssl crl` and the
+served `/crl` endpoint). The companion `-ca` flag still provides the CA
+certificate. For example:
 
 ```
 $ cfssl sign \
@@ -427,7 +429,8 @@ supplied with either `pin-value` (the PIN inline) or `pin-source`. A
   PIN from a file.
 
 A binary built without the `pkcs11` tag reports a clear "unavailable"
-error if a `pkcs11:` URI is supplied.
+error if a `pkcs11:` URI is supplied. `CFSSL_CA_PK_PASSWORD` has no
+effect on a PKCS #11 key; the token PIN comes from the URI.
 
 ### Additional Documentation
 

@@ -11,9 +11,9 @@ import (
 	"github.com/cloudflare/cfssl/api"
 	"github.com/cloudflare/cfssl/certdb"
 	"github.com/cloudflare/cfssl/crl"
-	"github.com/cloudflare/cfssl/errors"
 	"github.com/cloudflare/cfssl/helpers"
 	"github.com/cloudflare/cfssl/log"
+	"github.com/cloudflare/cfssl/signer/keyload"
 )
 
 // A Handler accepts requests with a serial number parameter
@@ -31,11 +31,6 @@ func NewHandler(dbAccessor certdb.Accessor, caPath string, caKeyPath string) (ht
 		return nil, err
 	}
 
-	caKey, err := helpers.ReadBytes(caKeyPath)
-	if err != nil {
-		return nil, errors.Wrap(errors.PrivateKeyError, errors.ReadFailed, err)
-	}
-
 	// Parse the PEM encoded certificate
 	issuerCert, err := helpers.ParseCertificatePEM(ca)
 	if err != nil {
@@ -48,8 +43,8 @@ func NewHandler(dbAccessor certdb.Accessor, caPath string, caKeyPath string) (ht
 		password = nil
 	}
 
-	// Parse the key given
-	key, err := helpers.ParsePrivateKeyPEMWithPassword(caKey, password)
+	// Load the key, which may be a PEM file or a pkcs11: URI
+	key, err := keyload.LoadSigner(caKeyPath, password)
 	if err != nil {
 		log.Debugf("malformed private key %v", err)
 		return nil, err

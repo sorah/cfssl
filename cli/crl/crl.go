@@ -8,9 +8,9 @@ import (
 	certsql "github.com/cloudflare/cfssl/certdb/sql"
 	"github.com/cloudflare/cfssl/cli"
 	"github.com/cloudflare/cfssl/crl"
-	cferr "github.com/cloudflare/cfssl/errors"
 	"github.com/cloudflare/cfssl/helpers"
 	"github.com/cloudflare/cfssl/log"
+	"github.com/cloudflare/cfssl/signer/keyload"
 
 	"github.com/jmoiron/sqlx"
 )
@@ -53,15 +53,6 @@ func generateCRL(c cli.Config) (crlBytes []byte, err error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := cli.CheckCAKeyNotPKCS11(c.CAKeyFile); err != nil {
-		return nil, err
-	}
-	log.Debug("loading CA key: ", c.CAKeyFile)
-	cakey, err := helpers.ReadBytes(c.CAKeyFile)
-	if err != nil {
-		return nil, cferr.Wrap(cferr.CertificateError, cferr.ReadFailed, err)
-	}
-
 	// Parse the PEM encoded certificate
 	issuerCert, err := helpers.ParseCertificatePEM(ca)
 	if err != nil {
@@ -74,8 +65,9 @@ func generateCRL(c cli.Config) (crlBytes []byte, err error) {
 		password = nil
 	}
 
-	// Parse the key given
-	key, err := helpers.ParsePrivateKeyPEMWithPassword(cakey, password)
+	// Load the key, which may be a PEM file or a pkcs11: URI
+	log.Debug("loading CA key: ", c.CAKeyFile)
+	key, err := keyload.LoadSigner(c.CAKeyFile, password)
 	if err != nil {
 		log.Debugf("malformed private key %v", err)
 		return nil, err

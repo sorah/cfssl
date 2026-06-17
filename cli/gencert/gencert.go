@@ -38,15 +38,6 @@ Flags:
 var gencertFlags = []string{"initca", "remote", "ca", "ca-key", "config", "cn", "hostname", "profile", "label"}
 
 func gencertMain(args []string, c cli.Config) error {
-	if (c.RenewCA || c.IsCA) && c.CAKeyFile != "" {
-		// initca/renewca read the CA key directly as a file; a PKCS #11
-		// key cannot be used to bootstrap or regenerate a CA here.
-		if err := cli.CheckCAKeyNotPKCS11(c.CAKeyFile); err != nil {
-			log.Errorf("%v\n", err)
-			return err
-		}
-	}
-
 	if c.RenewCA {
 		log.Infof("re-generate a CA certificate from CA cert and key")
 		cert, err := initca.RenewFromPEM(c.CAFile, c.CAKeyFile)

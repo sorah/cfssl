@@ -20,6 +20,7 @@ import (
 	"github.com/cloudflare/cfssl/helpers"
 	"github.com/cloudflare/cfssl/log"
 	"github.com/cloudflare/cfssl/signer"
+	"github.com/cloudflare/cfssl/signer/keyload"
 	"github.com/cloudflare/cfssl/signer/local"
 )
 
@@ -101,14 +102,10 @@ func New(req *csr.CertificateRequest) (cert, csrPEM, key []byte, err error) {
 	return
 }
 
-// NewFromPEM creates a new root certificate from the key file passed in.
+// NewFromPEM creates a new root certificate from the key passed in. The
+// key may be a PEM key file or a pkcs11: URI (RFC 7512).
 func NewFromPEM(req *csr.CertificateRequest, keyFile string) (cert, csrPEM []byte, err error) {
-	privData, err := helpers.ReadBytes(keyFile)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	priv, err := helpers.ParsePrivateKeyPEM(privData)
+	priv, err := keyload.LoadSigner(keyFile, nil)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -116,11 +113,12 @@ func NewFromPEM(req *csr.CertificateRequest, keyFile string) (cert, csrPEM []byt
 	return NewFromSigner(req, priv)
 }
 
-// RenewFromPEM re-creates a root certificate from the CA cert and key
-// files. The resulting root certificate will have the input CA certificate
-// as the template and have the same expiry length. E.g. the existing CA
-// is valid for a year from Jan 01 2015 to Jan 01 2016, the renewed certificate
-// will be valid from now and expire in one year as well.
+// RenewFromPEM re-creates a root certificate from the CA cert and key.
+// The key may be a PEM key file or a pkcs11: URI (RFC 7512). The resulting
+// root certificate will have the input CA certificate as the template and
+// have the same expiry length. E.g. the existing CA is valid for a year
+// from Jan 01 2015 to Jan 01 2016, the renewed certificate will be valid
+// from now and expire in one year as well.
 func RenewFromPEM(caFile, keyFile string) ([]byte, error) {
 	caBytes, err := helpers.ReadBytes(caFile)
 	if err != nil {
@@ -132,12 +130,7 @@ func RenewFromPEM(caFile, keyFile string) ([]byte, error) {
 		return nil, err
 	}
 
-	keyBytes, err := helpers.ReadBytes(keyFile)
-	if err != nil {
-		return nil, err
-	}
-
-	key, err := helpers.ParsePrivateKeyPEM(keyBytes)
+	key, err := keyload.LoadSigner(keyFile, nil)
 	if err != nil {
 		return nil, err
 	}

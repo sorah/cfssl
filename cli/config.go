@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"errors"
 	"flag"
 	"time"
 
@@ -80,7 +79,7 @@ func registerFlags(c *Config, f *flag.FlagSet) {
 	f.StringVar(&c.CertFile, "cert", "", "Client certificate that contains the public key")
 	f.StringVar(&c.CSRFile, "csr", "", "Certificate signature request file for new public key")
 	f.StringVar(&c.CAFile, "ca", "", "CA used to sign the new certificate -- accepts '[file:]fname' or 'env:varname'")
-	f.StringVar(&c.CAKeyFile, "ca-key", "", "CA private key -- accepts '[file:]fname', 'env:varname', or, for signing, a 'pkcs11:' URI (requires the pkcs11 build tag)")
+	f.StringVar(&c.CAKeyFile, "ca-key", "", "CA private key -- accepts '[file:]fname', 'env:varname', or a 'pkcs11:' URI (requires the pkcs11 build tag)")
 	f.StringVar(&c.TLSCertFile, "tls-cert", "", "Other endpoint CA to set up TLS protocol")
 	f.StringVar(&c.TLSKeyFile, "tls-key", "", "Other endpoint CA private key")
 	f.StringVar(&c.MutualTLSCAFile, "mutual-tls-ca", "", "Mutual TLS - require clients be signed by this CA ")
@@ -154,19 +153,4 @@ func RootFromConfig(c *Config) universal.Root {
 		Config:      cfg,
 		ForceRemote: c.Remote != "",
 	}
-}
-
-// ErrPKCS11Unsupported is returned by commands that read the CA key
-// directly as a file and therefore cannot use a PKCS #11 key. Only the
-// signing operations (sign, gencert, serve) honor a "pkcs11:" -ca-key.
-var ErrPKCS11Unsupported = errors.New("PKCS #11 keys (pkcs11: URIs) are only supported for signing operations, not this command")
-
-// CheckCAKeyNotPKCS11 returns ErrPKCS11Unsupported when caKey is a
-// PKCS #11 URI. Commands that consume the CA key as a file should call
-// this to fail with a clear message instead of an opaque file error.
-func CheckCAKeyNotPKCS11(caKey string) error {
-	if pkcs11uri.IsPKCS11URI(caKey) {
-		return ErrPKCS11Unsupported
-	}
-	return nil
 }
